@@ -1,7 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import ProctorPage from './pages/ProctorPage';
 import StudentPage from './pages/StudentPage';
-import './styles/common.css';
 
 function App() {
     return (
