@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import StudentJoinForm from '../components/student/StudentJoinForm';
 import StudentVideoView from '../components/student/StudentVideoView';
-import '../styles/student.css';
 
 export default function StudentPage() {
     const [isJoined, setIsJoined] = useState(false);
@@ -13,12 +12,12 @@ export default function StudentPage() {
     };
 
     return (
-        <div className="student-page">
+        <>
             {!isJoined ? (
                 <StudentJoinForm onJoin={handleJoin} />
             ) : (
                 <StudentVideoView studentInfo={studentInfo} />
             )}
-        </div>
+        </>
     );
 }

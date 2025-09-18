@@ -30,17 +30,19 @@ export default function ProctorDashboard() {
     };
 
     return (
-        <div className="proctor-dashboard">
+        <div className="min-h-screen flex flex-col">
             {/* Header */}
-            <header className="header">
-                <h1>Proctor Dashboard</h1>
-                <div className="header-controls">
-                    <button className="btn btn-primary">Start Room</button>
+            <header className="bg-gray-100 border-b border-gray-300 p-4 px-8 flex justify-between items-center">
+                <h1 className="text-gray-800 text-2xl font-semibold">Proctor Dashboard</h1>
+                <div>
+                    <button className="py-2 px-6 rounded-lg border-0 text-sm font-medium cursor-pointer transition-all duration-300 bg-primary text-white hover:-translate-y-0.5 hover:shadow-xl">
+                        Start Room
+                    </button>
                 </div>
             </header>
 
             {/* Join Requests */}
-            <div className="join-requests">
+            <div className="fixed top-[100px] right-8 w-80 z-[150]">
                 {mockJoinRequests.map(req => (
                     <JoinRequestCard
                         key={req.id}
@@ -52,27 +54,29 @@ export default function ProctorDashboard() {
             </div>
 
             {/* Students Grid */}
-            <div className="students-grid">
+            <div className="grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-6 p-8 flex-1">
                 {mockStudents.map(student => (
                     <StudentCard key={student.id} student={student} />
                 ))}
             </div>
 
             {/* Proctor Video Circle */}
-            <div className="proctor-video-container">
-                <div className="video-placeholder">Your Video</div>
+            <div className="fixed bottom-[100px] right-8 w-[180px] h-[180px] rounded-full overflow-hidden border-4 border-white shadow-2xl z-[100]">
+                <div className="w-full h-full bg-gray-950 text-gray-600 flex items-center justify-center text-xl">
+                    Your Video
+                </div>
             </div>
 
             {/* Bottom Bar */}
-            <div className="bottom-bar">
-                <div className="room-info">
-                    <div className="info-item">
-                        <span className="info-label">Room ID:</span>
-                        <span className="info-value">{roomId}</span>
+            <div className="fixed bottom-0 left-0 right-0 bg-black/80 backdrop-blur-md p-4 px-8 flex justify-between items-center border-t border-white/10 z-[200]">
+                <div className="flex gap-8 text-white">
+                    <div className="flex items-center gap-2">
+                        <span className="opacity-70 text-sm">Room ID:</span>
+                        <span className="font-semibold">{roomId}</span>
                     </div>
-                    <div className="info-item">
-                        <span className="info-label">Students:</span>
-                        <span className="info-value">{mockStudents.length}</span>
+                    <div className="flex items-center gap-2">
+                        <span className="opacity-70 text-sm">Students:</span>
+                        <span className="font-semibold">{mockStudents.length}</span>
                     </div>
                 </div>
 
