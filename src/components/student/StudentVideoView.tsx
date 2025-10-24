@@ -1,19 +1,145 @@
-import { useState } from 'react';
+import {useCallback, useEffect, useRef, useState} from 'react';
 import MediaControls from '../shared/MediaControls';
+import {useMediaDevices} from "../../hooks/useMediaDevices.ts";
+import {extractPeerIdFromTrack, isProctorTrack} from "../../utils/trackIdentification.ts";
+import {useWebRTC} from "../../hooks/useWebRTC.ts";
+import type {SignalingMessage} from "../../types/signaling.types.ts";
+import {useWebSocket} from "../../hooks/useWebSocket.ts";
 
 interface StudentVideoViewProps {
     studentInfo: {
         name: string;
         roomId: string;
+        peerId: string;
     };
 }
 
 export default function StudentVideoView({ studentInfo }: StudentVideoViewProps) {
-    const [isVideoOn, setIsVideoOn] = useState(true);
-    const [isAudioOn, setIsAudioOn] = useState(true);
+    const [proctorStream, setProctorStream] = useState<MediaStream | null>(null);
+    const proctorVideoRef = useRef<HTMLVideoElement>(null);
+    const studentVideoRef = useRef<HTMLVideoElement>(null);
+
+    const {
+        localStream,
+        isVideoEnabled,
+        isAudioEnabled,
+        startMedia,
+        toggleVideo,
+        toggleAudio
+    } = useMediaDevices();
+
+    // Handle remote tracks (proctor video)
+    const handleRemoteTrack = useCallback((event: RTCTrackEvent) => {
+        const { track, streams } = event;
+
+        // Only process video tracks
+        if (track.kind !== 'video') return;
+
+        const stream = streams[0];
+        if (!stream) return;
+
+        const peerId = extractPeerIdFromTrack(track.id, stream.id);
+
+        if (peerId && isProctorTrack(peerId)) {
+            console.log('👨‍🏫 Setting proctor stream');
+            setProctorStream(stream);
+        }
+    }, []);
+
+    const { handleOffer, handleRenegotiation, addIceCandidate } = useWebRTC({
+        localStream,
+        onRemoteTrack: handleRemoteTrack
+    });
+
+    const handleMessage = useCallback(async (msg: SignalingMessage) => {
+        console.log('📨 Received:', msg);
+
+        switch (msg.type) {
+            case 'offer':
+                { const answerSdp = await handleOffer(msg.sdp, (candidate) => {
+                    send({
+                        type: 'IceCandidate',
+                        peer_id: studentInfo.peerId,
+                        candidate: candidate.candidate,
+                        sdp_mid: candidate.sdpMid || undefined,
+                        sdp_mline_index: candidate.sdpMLineIndex || undefined
+                    });
+                });
+
+                send({
+                    type: 'Answer',
+                    peer_id: studentInfo.peerId,
+                    sdp: answerSdp
+                });
+                break; }
+
+            case 'renegotiate':
+                { const renegotiateSdp = await handleRenegotiation(msg.sdp);
+                send({
+                    type: 'Answer',
+                    peer_id: studentInfo.peerId,
+                    sdp: renegotiateSdp
+                });
+                break; }
+
+            case 'IceCandidate':
+                if (msg.candidate) {
+                    await addIceCandidate({
+                        candidate: msg.candidate,
+                        sdpMid: msg.sdp_mid,
+                        sdpMLineIndex: msg.sdp_mline_index
+                    });
+                }
+                break;
+        }
+    }, [handleOffer, handleRenegotiation, addIceCandidate, studentInfo.peerId]);
+
+    const { send } = useWebSocket(handleMessage);
+
+    useEffect(() => {
+        const init = async () => {
+            try {
+                // Start media first
+                await startMedia();
+
+                // Wait a bit for media to stabilize
+                await new Promise(resolve => setTimeout(resolve, 500));
+
+                // Send Join message
+                send({
+                    type: 'Join',
+                    room_id: studentInfo.roomId,
+                    peer_id: studentInfo.peerId,
+                    name: studentInfo.name,
+                    role: 'student'
+                });
+
+                console.log('✅ Student joined');
+            } catch (err) {
+                console.error('❌ Failed to initialize:', err);
+            }
+        };
+        init();
+    }, [startMedia, send, studentInfo]);
+
+    useEffect(() => {
+        if (proctorVideoRef.current && proctorStream) {
+            proctorVideoRef.current.srcObject = proctorStream;
+        }
+    }, [proctorStream]);
+
+    useEffect(() => {
+        if (studentVideoRef.current && localStream) {
+            studentVideoRef.current.srcObject = localStream;
+        }
+    }, [localStream]);
 
     const handleLeave = () => {
         if (confirm('Are you sure you want to leave?')) {
+            send({
+                type: 'Leave',
+                peer_id: studentInfo.peerId
+            });
             window.location.reload();
         }
     };
@@ -38,32 +164,53 @@ export default function StudentVideoView({ studentInfo }: StudentVideoViewProps)
             <div className="flex-1 flex">
                 {/* Proctor Side */}
                 <div className="w-1/2 bg-gray-950 relative flex items-center justify-center">
-                    <div className="w-full h-full bg-gray-950 text-gray-600 flex items-center justify-center text-xl">
-                        Proctor Video
-                    </div>
-                    <div className="absolute bottom-5 left-5 bg-black/70 text-white py-2 px-4 rounded-lg text-sm">
-                        👨‍🏫 Proctor
-                    </div>
+                    {proctorStream ? (
+                        <>
+                            <video
+                                ref={proctorVideoRef}
+                                className="w-full h-full bg-gray-950 text-gray-600 flex items-center justify-center text-xl"
+                                autoPlay
+                                playsInline
+                            />
+                            <div className="absolute bottom-5 left-5 bg-black/70 text-white py-2 px-4 rounded-lg text-sm">
+                                👨‍🏫 Proctor
+                            </div>
+                        </>
+                    ) : (
+                        <div className="video-placeholder">Waiting for Proctor...</div>
+                    )}
                 </div>
 
                 {/* Student Side */}
                 <div className="w-1/2 bg-gray-950 relative flex items-center justify-center">
-                    <div className="w-full h-full bg-gray-950 text-gray-600 flex items-center justify-center text-xl">
-                        Your Video
-                    </div>
-                    <div className="absolute bottom-5 right-5 bg-black/70 text-white py-2 px-4 rounded-lg text-sm">
-                        {studentInfo.name}
-                    </div>
+                    {localStream ? (
+                        <>
+                            <video
+                                ref={studentVideoRef}
+                                className="w-full h-full object-cover"
+                                autoPlay
+                                muted
+                                playsInline
+                            />
+                            <div className="absolute bottom-5 right-5 bg-black/70 text-white py-2 px-4 rounded-lg text-sm">
+                                {studentInfo.name}
+                            </div>
+                        </>
+                    ) : (
+                        <div className="w-full h-full bg-gray-950 text-gray-600 flex items-center justify-center text-xl">
+                            Your Video
+                        </div>
+                    )}
                 </div>
             </div>
 
             {/* Bottom Controls */}
             <div className="fixed bottom-0 left-0 right-0 bg-black/80 backdrop-blur-md p-4 px-8 flex justify-center z-[200]">
                 <MediaControls
-                    isVideoOn={isVideoOn}
-                    isAudioOn={isAudioOn}
-                    onToggleVideo={() => setIsVideoOn(!isVideoOn)}
-                    onToggleAudio={() => setIsAudioOn(!isAudioOn)}
+                    isVideoOn={isVideoEnabled}
+                    isAudioOn={isAudioEnabled}
+                    onToggleVideo={toggleVideo}
+                    onToggleAudio={toggleAudio}
                 />
             </div>
         </div>
