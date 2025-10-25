@@ -11,11 +11,11 @@ class WebSocketService {
         return new Promise((resolve, reject) => {
             const wsUrl = url || import.meta.env.VITE_WS_URL;
 
-            console.log('🔌 Connecting to WebSocket:', wsUrl);
+            console.log('Connecting to WebSocket:', wsUrl);
             this.ws = new WebSocket(wsUrl);
 
             this.ws.onopen = () => {
-                console.log('✅ WebSocket connected');
+                console.log('WebSocket connected');
                 this.isConnected = true;
                 resolve();
             };
@@ -23,20 +23,20 @@ class WebSocketService {
             this.ws.onmessage = (event) => {
                 try {
                     const message = JSON.parse(event.data) as SignalingMessage;
-                    console.log('📨 Received:', message);
+                    console.log('Received:', message);
                     this.messageHandlers.forEach(handler => handler(message));
                 } catch (error) {
-                    console.error('❌ Failed to parse message:', error);
+                    console.error('Failed to parse message:', error);
                 }
             };
 
             this.ws.onerror = (error) => {
-                console.error('❌ WebSocket error:', error);
+                console.error('WebSocket error:', error);
                 reject(error);
             };
 
             this.ws.onclose = () => {
-                console.log('🔌 WebSocket closed');
+                console.log(' WebSocket closed');
                 this.isConnected = false;
             };
         });
@@ -47,7 +47,7 @@ class WebSocketService {
             console.log('📤 Sending:', message);
             this.ws.send(JSON.stringify(message));
         } else {
-            console.error('❌ WebSocket not connected');
+            console.error('WebSocket not connected');
         }
     }
 

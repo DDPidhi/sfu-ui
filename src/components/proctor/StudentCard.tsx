@@ -9,9 +9,18 @@ export default function StudentCard({ student }: StudentCardProps) {
     const videoRef = useRef<HTMLVideoElement>(null);
     useEffect(() => {
         if (videoRef.current && student.stream) {
+            console.log('Setting video stream for student:', student.id, student.stream);
             videoRef.current.srcObject = student.stream;
+
+            // Log when video starts playing
+            videoRef.current.onloadedmetadata = () => {
+                console.log('Video metadata loaded for:', student.name);
+            };
+            videoRef.current.onplay = () => {
+                console.log('Video playing for:', student.name);
+            };
         }
-    }, [student.stream]);
+    }, [student.stream, student.id, student.name]);
     return (
         <div className="bg-white rounded-2xl p-4 border border-gray-300 shadow-md transition-transform duration-300 hover:-translate-y-1">
             <div className="w-full aspect-video bg-gray-950 rounded-xl overflow-hidden">
@@ -21,6 +30,7 @@ export default function StudentCard({ student }: StudentCardProps) {
                         autoPlay
                         playsInline
                         muted
+                        className="w-full h-full object-cover"
                     />
                 ) : (
                     <div className="w-full h-full bg-gray-950 text-gray-600 flex items-center justify-center text-xl">

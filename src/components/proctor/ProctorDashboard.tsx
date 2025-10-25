@@ -1,7 +1,8 @@
-import {useCallback, useEffect, useState} from 'react';
+import {useCallback, useEffect, useRef, useState} from 'react';
 import StudentCard from './StudentCard';
 import JoinRequestCard from './JoinRequestCard';
 import MediaControls from "../shared/MediaControls.tsx";
+import {ConnectionStatus} from "../shared/ConnectionStatus.tsx";
 import type {JoinRequest, StudentInfo} from "../../types/room.types.ts";
 import {useMediaDevices} from "../../hooks/useMediaDevices.ts";
 import {extractPeerIdFromTrack, isStudentTrack} from "../../utils/trackIdentification.ts";
@@ -17,7 +18,12 @@ export default function ProctorDashboard() {
     const [studentNames, setStudentNames] = useState<Map<string, string>>(new Map());
     const [joinRequests, setJoinRequests] = useState<JoinRequest[]>([]);
 
-    // Media devices hook
+    const studentNamesRef = useRef<Map<string, string>>(new Map());
+
+    useEffect(() => {
+        studentNamesRef.current = studentNames;
+    }, [studentNames]);
+
     const {
         localStream,
         isVideoEnabled,
@@ -27,45 +33,85 @@ export default function ProctorDashboard() {
         toggleAudio
     } = useMediaDevices();
 
-    // Handle remote tracks from students
     const handleRemoteTrack = useCallback((event: RTCTrackEvent) => {
         const { track, streams } = event;
 
-        // Only process video tracks to avoid duplicates
-        if (track.kind !== 'video') return;
+        console.log('Remote track received:', {
+            kind: track.kind,
+            trackId: track.id,
+            streamId: streams[0]?.id,
+            streamsCount: streams.length
+        });
 
         const stream = streams[0];
-        if (!stream) return;
+        if (!stream) {
+            console.warn('No stream in track event');
+            return;
+        }
 
         const studentId = extractPeerIdFromTrack(track.id, stream.id);
+        console.log('Extracted participant ID:', studentId);
 
         if (studentId && isStudentTrack(studentId)) {
-            console.log('👨‍🎓 Adding student:', studentId);
+            console.log('Processing track for student:', studentId, track.kind);
 
             setStudents(prev => {
                 const updated = new Map(prev);
                 const existing = updated.get(studentId);
-                updated.set(studentId, {
+
+                let mediaStream: MediaStream;
+                if (existing?.stream) {
+                    mediaStream = existing.stream;
+                    console.log('Adding', track.kind, 'track to existing stream for:', studentId);
+                } else {
+                    mediaStream = new MediaStream();
+                    console.log('Created new MediaStream for:', studentId);
+                }
+
+                const existingTrackIds = mediaStream.getTracks().map(t => t.id);
+                if (!existingTrackIds.includes(track.id)) {
+                    mediaStream.addTrack(track);
+                    console.log('Added', track.kind, 'track to MediaStream for:', studentId);
+                } else {
+                    console.log('Track already in stream, skipping');
+                }
+
+                const videoTracks = mediaStream.getVideoTracks();
+                const audioTracks = mediaStream.getAudioTracks();
+
+                const studentInfo = {
                     id: studentId,
-                    name: studentNames.get(studentId) || existing?.name || studentId,
-                    stream: stream,
-                    hasVideo: true,
-                    hasAudio: true
+                    name: studentNamesRef.current.get(studentId) || existing?.name || studentId,
+                    stream: mediaStream,
+                    hasVideo: videoTracks.length > 0 && videoTracks[0].enabled,
+                    hasAudio: audioTracks.length > 0 && audioTracks[0].enabled
+                };
+
+                console.log('Participant info updated:', {
+                    id: studentId,
+                    name: studentInfo.name,
+                    videoTracks: videoTracks.length,
+                    audioTracks: audioTracks.length,
+                    totalTracks: mediaStream.getTracks().length
                 });
+
+                updated.set(studentId, studentInfo);
+                console.log('Total participants now:', updated.size);
                 return updated;
             });
+        } else {
+            console.log('Not a participant track or invalid ID:', studentId);
         }
-    }, [studentNames]);
+    }, []);
 
-    // WebRTC hook
+
     const { handleOffer, handleRenegotiation, addIceCandidate } = useWebRTC({
         localStream,
         onRemoteTrack: handleRemoteTrack
     });
 
-    // Handle WebSocket messages
     const handleMessage = useCallback(async (msg: SignalingMessage) => {
-        console.log('📨 Received:', msg);
+        console.log('Received:', msg);
         switch (msg.type) {
             case 'RoomCreated':
                 setRoomId(msg.room_id);
@@ -99,9 +145,18 @@ export default function ProctorDashboard() {
                 break; }
 
             case 'JoinRequest':
-                console.log('📋 Join request from:', msg.peer_id, msg.name);
+                console.log('Join request from:', msg.peer_id, msg.name);
                 if (msg.name) {
                     setStudentNames(prev => new Map(prev).set(msg.peer_id, msg.name!));
+                    setStudents(prev => {
+                        const updated = new Map(prev);
+                        const existing = updated.get(msg.peer_id);
+                        if (existing) {
+                            updated.set(msg.peer_id, { ...existing, name: msg.name! });
+                            console.log('Updated existing participant name:', msg.peer_id, msg.name);
+                        }
+                        return updated;
+                    });
                 }
                 setJoinRequests(prev => [...prev, {
                     id: msg.peer_id,
@@ -124,21 +179,20 @@ export default function ProctorDashboard() {
 
     const { connect, send } = useWebSocket(handleMessage);
 
-    // Initialize media and WebSocket
     useEffect(() => {
         const init = async () => {
             try {
                 await startMedia();
                 await connect();
-                console.log('✅ Proctor initialized');
+                console.log('Proctor initialized');
             } catch (err) {
-                console.error('❌ Initialization failed:', err);
+                console.error('Initialization failed:', err);
             }
         };
         init();
     }, [startMedia, connect]);
 
-    // Create room
+
     const handleStartRoom = () => {
         send({
             type: 'CreateRoom',
@@ -147,9 +201,8 @@ export default function ProctorDashboard() {
         });
     };
 
-    // Approve student
     const handleApprove = (studentPeerId: string) => {
-        console.log('✅ Approving student:', studentPeerId);
+        console.log('Approving participant:', studentPeerId);
         send({
             type: 'JoinResponse',
             room_id: roomId!,
@@ -160,9 +213,9 @@ export default function ProctorDashboard() {
         setJoinRequests(prev => prev.filter(r => r.peer_id !== studentPeerId));
     };
 
-    // Deny student
+
     const handleDeny = (studentPeerId: string) => {
-        console.log('❌ Denying student:', studentPeerId);
+        console.log('Denying participant:', studentPeerId);
         send({
             type: 'JoinResponse',
             room_id: roomId!,
@@ -175,6 +228,7 @@ export default function ProctorDashboard() {
 
     return (
         <div className="min-h-screen flex flex-col">
+            <ConnectionStatus />
             {/* Header */}
             <header className="bg-gray-100 border-b border-gray-300 p-4 px-8 flex justify-between items-center">
                 <h1 className="text-gray-800 text-2xl font-semibold">Proctor Dashboard</h1>
@@ -201,7 +255,7 @@ export default function ProctorDashboard() {
                 ))}
             </div>
 
-            {/* Students Grid */}
+            {/* Participants Grid */}
             <div className="grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-6 p-8 flex-1">
                 {Array.from(students.values()).map(student => (
                     <StudentCard key={student.id} student={student} />
@@ -226,6 +280,7 @@ export default function ProctorDashboard() {
                         autoPlay
                         muted
                         playsInline
+                        className="w-full h-full object-cover"
                     />
                 </div>
             </div>

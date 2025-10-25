@@ -9,7 +9,7 @@ interface JoinRequestCardProps {
 export default function JoinRequestCard({ request, onApprove, onDeny }: JoinRequestCardProps) {
     return (
         <div className="bg-white rounded-xl p-4 mb-4 shadow-lg">
-            <div className="font-semibold mb-2 text-gray-800">Student Join Request</div>
+            <div className="font-semibold mb-2 text-gray-800">Join Request</div>
             <div className="text-gray-600 text-sm mb-4">
                 Name: {request.name}
             </div>

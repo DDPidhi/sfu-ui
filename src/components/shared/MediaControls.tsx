@@ -31,12 +31,12 @@ export default function MediaControls({
             >
                 📹
             </button>
-            <button
-                className="w-12 h-12 rounded-full border-0 bg-white/10 text-white text-2xl flex items-center justify-center cursor-pointer transition-all duration-300 hover:bg-white/20"
-                title="Settings"
-            >
-                ⚙️
-            </button>
+            {/*<button*/}
+            {/*    className="w-12 h-12 rounded-full border-0 bg-white/10 text-white text-2xl flex items-center justify-center cursor-pointer transition-all duration-300 hover:bg-white/20"*/}
+            {/*    title="Settings"*/}
+            {/*>*/}
+            {/*    ⚙️*/}
+            {/*</button>*/}
         </div>
     );
 }

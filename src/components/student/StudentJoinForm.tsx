@@ -14,7 +14,7 @@ export default function StudentJoinForm({ onJoin }: StudentJoinFormProps) {
     const [isRequesting, setIsRequesting] = useState(false);
 
     const handleMessage = (msg: SignalingMessage) => {
-        console.log('📨 Student received:', msg);
+        console.log('Participant received:', msg);
 
         switch (msg.type) {
             case 'join_request_sent':
@@ -23,7 +23,6 @@ export default function StudentJoinForm({ onJoin }: StudentJoinFormProps) {
 
             case 'join_approved':
                 setStatus('Approved! Setting up...');
-                // Trigger join flow in parent
                 setTimeout(() => {
                     onJoin(name, roomId, peerId);
                 }, 500);
@@ -77,7 +76,7 @@ export default function StudentJoinForm({ onJoin }: StudentJoinFormProps) {
     return (
         <div className="flex justify-center items-center min-h-screen p-8 bg-gradient-to-br from-primary to-primary-dark">
             <div className="bg-white/95 backdrop-blur-md rounded-2xl p-12 w-full max-w-md shadow-2xl">
-                <h1 className="text-gray-800 text-center mb-8 text-3xl">Join Class</h1>
+                <h1 className="text-gray-800 text-center mb-8 text-3xl">Join Room</h1>
                 <form onSubmit={handleSubmit}>
                     <div className="mb-6">
                         <label className="block mb-2 text-gray-600 font-medium">Your Name</label>
@@ -108,7 +107,7 @@ export default function StudentJoinForm({ onJoin }: StudentJoinFormProps) {
                         type="submit"
                         className="w-full p-4 bg-primary text-white border-0 rounded-xl text-lg font-semibold cursor-pointer transition-all duration-300 hover:-translate-y-0.5 hover:shadow-xl hover:shadow-primary/40"
                     >
-                        {isRequesting ? 'Joining...' : 'Join Class'}
+                        {isRequesting ? 'Joining...' : 'Join Room'}
                     </button>
                 </form>
                 {status && (

@@ -8,11 +8,14 @@ export const useMediaDevices = () => {
 
     const streamRef = useRef<MediaStream | null>(null);
 
-    const startMedia = useCallback(async (constraints = { video: true, audio: true }) => {
+    const startMedia = useCallback(async (
+        constraints: MediaStreamConstraints = { video: true, audio: true },
+        retries = 0
+    ): Promise<MediaStream> => {
         try {
-            console.log('🎥 Requesting media access...');
+            console.log('Requesting media access...');
             const stream = await navigator.mediaDevices.getUserMedia(constraints);
-            console.log('✅ Media access granted');
+            console.log('Media access granted');
 
             streamRef.current = stream;
             setLocalStream(stream);
@@ -20,7 +23,18 @@ export const useMediaDevices = () => {
             return stream;
         } catch (err) {
             const errorMsg = err instanceof Error ? err.message : 'Failed to access media';
-            console.error('❌ Media access failed:', errorMsg);
+            console.error('Media access failed:', errorMsg);
+
+            // Retry with degraded constraints if initial attempt fails
+            if (retries < 2) {
+                console.log('Retrying with degraded quality...');
+                const degradedConstraints: MediaStreamConstraints = {
+                    video: retries === 0 ? { width: 640, height: 480 } : true,
+                    audio: true
+                };
+                return startMedia(degradedConstraints, retries + 1);
+            }
+
             setError(errorMsg);
             throw err;
         }
@@ -28,7 +42,7 @@ export const useMediaDevices = () => {
 
     const stopMedia = useCallback(() => {
         if (streamRef.current) {
-            console.log('🛑 Stopping media tracks');
+            console.log('Stopping media tracks');
             streamRef.current.getTracks().forEach(track => track.stop());
             streamRef.current = null;
             setLocalStream(null);
@@ -42,7 +56,7 @@ export const useMediaDevices = () => {
                 track.enabled = enabled;
             });
             setIsVideoEnabled(enabled);
-            console.log(`📹 Video ${enabled ? 'enabled' : 'disabled'}`);
+            console.log(`Video ${enabled ? 'enabled' : 'disabled'}`);
         }
     }, [isVideoEnabled]);
 
@@ -53,7 +67,7 @@ export const useMediaDevices = () => {
                 track.enabled = enabled;
             });
             setIsAudioEnabled(enabled);
-            console.log(`🎤 Audio ${enabled ? 'enabled' : 'disabled'}`);
+            console.log(`Audio ${enabled ? 'enabled' : 'disabled'}`);
         }
     }, [isAudioEnabled]);
 

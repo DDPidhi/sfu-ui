@@ -14,20 +14,20 @@ export const useWebRTC = ({ localStream, onRemoteTrack }: UseWebRTCProps) => {
         console.log('🔗 Creating peer connection');
 
         const pc = new RTCPeerConnection({
-            iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+            iceServers: [{ urls: import.meta.env.VITE_STUN_SERVER_URL }]
         });
 
         // Add local tracks
         if (localStream) {
             localStream.getTracks().forEach(track => {
-                console.log('➕ Adding local track:', track.kind, track.id);
+                console.log('Adding local track:', track.kind, track.id);
                 pc.addTrack(track, localStream);
             });
         }
 
         // Handle remote tracks
         pc.ontrack = (event) => {
-            console.log('📥 Received remote track:', event.track.kind, event.track.id);
+            console.log('Received remote track:', event.track.kind, event.track.id);
             if (onRemoteTrack) {
                 onRemoteTrack(event);
             }
@@ -36,18 +36,18 @@ export const useWebRTC = ({ localStream, onRemoteTrack }: UseWebRTCProps) => {
         // Handle ICE candidates
         pc.onicecandidate = (event) => {
             if (event.candidate) {
-                console.log('🧊 ICE candidate generated');
+                console.log('ICE candidate generated');
                 onIceCandidate(event.candidate);
             }
         };
 
         // Connection state logging
         pc.onconnectionstatechange = () => {
-            console.log('🔌 Connection state:', pc.connectionState);
+            console.log('Connection state:', pc.connectionState);
         };
 
         pc.oniceconnectionstatechange = () => {
-            console.log('🧊 ICE connection state:', pc.iceConnectionState);
+            console.log('ICE connection state:', pc.iceConnectionState);
         };
 
         pcRef.current = pc;
@@ -69,11 +69,11 @@ export const useWebRTC = ({ localStream, onRemoteTrack }: UseWebRTCProps) => {
         }
 
         await pc.setRemoteDescription(new RTCSessionDescription({ type: 'offer', sdp }));
-        console.log('✅ Remote description set');
+        console.log('Remote description set');
 
         const answer = await pc.createAnswer();
         await pc.setLocalDescription(answer);
-        console.log('✅ Answer created and local description set');
+        console.log('Answer created and local description set');
 
         return answer.sdp!;
     }, [createPeerConnection]);
@@ -83,14 +83,14 @@ export const useWebRTC = ({ localStream, onRemoteTrack }: UseWebRTCProps) => {
 
         const pc = pcRef.current;
         if (!pc) {
-            console.error('❌ No peer connection for renegotiation');
+            console.error('No peer connection for renegotiation');
             throw new Error('No peer connection');
         }
 
         await pc.setRemoteDescription(new RTCSessionDescription({ type: 'offer', sdp }));
         const answer = await pc.createAnswer();
         await pc.setLocalDescription(answer);
-        console.log('✅ Renegotiation answer created');
+        console.log('Renegotiation answer created');
 
         return answer.sdp!;
     }, []);
@@ -100,16 +100,16 @@ export const useWebRTC = ({ localStream, onRemoteTrack }: UseWebRTCProps) => {
         if (pc) {
             try {
                 await pc.addIceCandidate(new RTCIceCandidate(candidate));
-                console.log('✅ ICE candidate added');
+                console.log('ICE candidate added');
             } catch (err) {
-                console.error('❌ Failed to add ICE candidate:', err);
+                console.error('Failed to add ICE candidate:', err);
             }
         }
     }, []);
 
     const close = useCallback(() => {
         if (pcRef.current) {
-            console.log('🔌 Closing peer connection');
+            console.log('Closing peer connection');
             pcRef.current.close();
             pcRef.current = null;
             setPeerConnection(null);

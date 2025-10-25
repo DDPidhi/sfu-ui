@@ -1,5 +1,6 @@
 import {useCallback, useEffect, useRef, useState} from 'react';
 import MediaControls from '../shared/MediaControls';
+import {ConnectionStatus} from '../shared/ConnectionStatus';
 import {useMediaDevices} from "../../hooks/useMediaDevices.ts";
 import {extractPeerIdFromTrack, isProctorTrack} from "../../utils/trackIdentification.ts";
 import {useWebRTC} from "../../hooks/useWebRTC.ts";
@@ -16,6 +17,7 @@ interface StudentVideoViewProps {
 
 export default function StudentVideoView({ studentInfo }: StudentVideoViewProps) {
     const [proctorStream, setProctorStream] = useState<MediaStream | null>(null);
+    const [isWaitingForProctor, setIsWaitingForProctor] = useState(true);
     const proctorVideoRef = useRef<HTMLVideoElement>(null);
     const studentVideoRef = useRef<HTMLVideoElement>(null);
 
@@ -28,7 +30,7 @@ export default function StudentVideoView({ studentInfo }: StudentVideoViewProps)
         toggleAudio
     } = useMediaDevices();
 
-    // Handle remote tracks (proctor video)
+
     const handleRemoteTrack = useCallback((event: RTCTrackEvent) => {
         const { track, streams } = event;
 
@@ -41,8 +43,9 @@ export default function StudentVideoView({ studentInfo }: StudentVideoViewProps)
         const peerId = extractPeerIdFromTrack(track.id, stream.id);
 
         if (peerId && isProctorTrack(peerId)) {
-            console.log('👨‍🏫 Setting proctor stream');
+            console.log('Setting proctor stream');
             setProctorStream(stream);
+            setIsWaitingForProctor(false);
         }
     }, []);
 
@@ -52,7 +55,7 @@ export default function StudentVideoView({ studentInfo }: StudentVideoViewProps)
     });
 
     const handleMessage = useCallback(async (msg: SignalingMessage) => {
-        console.log('📨 Received:', msg);
+        console.log('Received:', msg);
 
         switch (msg.type) {
             case 'offer':
@@ -114,9 +117,9 @@ export default function StudentVideoView({ studentInfo }: StudentVideoViewProps)
                     role: 'student'
                 });
 
-                console.log('✅ Student joined');
+                console.log('Participant joined');
             } catch (err) {
-                console.error('❌ Failed to initialize:', err);
+                console.error('Failed to initialize:', err);
             }
         };
         init();
@@ -146,9 +149,10 @@ export default function StudentVideoView({ studentInfo }: StudentVideoViewProps)
 
     return (
         <div className="flex flex-col h-screen">
+            <ConnectionStatus />
             {/* Header */}
             <div className="bg-gray-100 border-b border-gray-300 p-4 px-8 flex justify-between items-center">
-                <h1 className="text-gray-800 text-2xl font-semibold">Class Session</h1>
+                <h1 className="text-gray-800 text-2xl font-semibold">Room Session</h1>
                 <div className="text-gray-600 text-sm">
                     {studentInfo.name} • Room: {studentInfo.roomId}
                 </div>
@@ -177,7 +181,16 @@ export default function StudentVideoView({ studentInfo }: StudentVideoViewProps)
                             </div>
                         </>
                     ) : (
-                        <div className="video-placeholder">Waiting for Proctor...</div>
+                        <div className="flex flex-col items-center justify-center text-gray-500">
+                            {isWaitingForProctor ? (
+                                <>
+                                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mb-4"></div>
+                                    <p>Connecting to proctor...</p>
+                                </>
+                            ) : (
+                                <p>Waiting for Proctor...</p>
+                            )}
+                        </div>
                     )}
                 </div>
 
