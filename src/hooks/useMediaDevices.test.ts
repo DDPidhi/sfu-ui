@@ -45,11 +45,22 @@ describe('useMediaDevices', () => {
       await waitFor(() => {
         expect(mockGetUserMedia).toHaveBeenCalledTimes(2);
         // First call with default constraints
-        expect(mockGetUserMedia).toHaveBeenNthCalledWith(1, { video: true, audio: true });
+        expect(mockGetUserMedia).toHaveBeenNthCalledWith(1, {
+          video: true,
+          audio: {
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true,
+          },
+        });
         // Second call with degraded constraints
         expect(mockGetUserMedia).toHaveBeenNthCalledWith(2, {
           video: { width: 640, height: 480 },
-          audio: true,
+          audio: {
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true,
+          },
         });
       });
 
