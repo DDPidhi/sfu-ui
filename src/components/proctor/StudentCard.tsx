@@ -29,7 +29,6 @@ export default function StudentCard({ student }: StudentCardProps) {
                         ref={videoRef}
                         autoPlay
                         playsInline
-                        muted
                         className="w-full h-full object-cover"
                     />
                 ) : (

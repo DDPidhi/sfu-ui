@@ -44,7 +44,7 @@ class WebSocketService {
 
     send(message: SignalingMessage): void {
         if (this.ws?.readyState === WebSocket.OPEN) {
-            console.log('📤 Sending:', message);
+            console.log('Sending:', message);
             this.ws.send(JSON.stringify(message));
         } else {
             console.error('WebSocket not connected');

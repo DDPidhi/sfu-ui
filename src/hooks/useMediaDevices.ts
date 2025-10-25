@@ -9,7 +9,14 @@ export const useMediaDevices = () => {
     const streamRef = useRef<MediaStream | null>(null);
 
     const startMedia = useCallback(async (
-        constraints: MediaStreamConstraints = { video: true, audio: true },
+        constraints: MediaStreamConstraints = {
+            video: true,
+            audio: {
+                echoCancellation: true,
+                noiseSuppression: true,
+                autoGainControl: true
+            }
+        },
         retries = 0
     ): Promise<MediaStream> => {
         try {
@@ -30,7 +37,11 @@ export const useMediaDevices = () => {
                 console.log('Retrying with degraded quality...');
                 const degradedConstraints: MediaStreamConstraints = {
                     video: retries === 0 ? { width: 640, height: 480 } : true,
-                    audio: true
+                    audio: {
+                        echoCancellation: true,
+                        noiseSuppression: true,
+                        autoGainControl: true
+                    }
                 };
                 return startMedia(degradedConstraints, retries + 1);
             }

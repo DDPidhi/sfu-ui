@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 
 interface UseWebRTCProps {
     localStream: MediaStream | null;
@@ -11,7 +11,7 @@ export const useWebRTC = ({ localStream, onRemoteTrack }: UseWebRTCProps) => {
     const onIceCandidateRef = useRef<((candidate: RTCIceCandidate) => void) | null>(null);
 
     const createPeerConnection = useCallback((onIceCandidate: (candidate: RTCIceCandidate) => void) => {
-        console.log('🔗 Creating peer connection');
+        console.log('Creating peer connection');
 
         const pc = new RTCPeerConnection({
             iceServers: [{ urls: import.meta.env.VITE_STUN_SERVER_URL }]
@@ -61,7 +61,7 @@ export const useWebRTC = ({ localStream, onRemoteTrack }: UseWebRTCProps) => {
         sdp: string,
         onIceCandidate: (candidate: RTCIceCandidate) => void
     ): Promise<string> => {
-        console.log('📨 Handling offer from SFU');
+        console.log('Handling offer from SFU');
 
         let pc = pcRef.current;
         if (!pc) {
@@ -79,7 +79,7 @@ export const useWebRTC = ({ localStream, onRemoteTrack }: UseWebRTCProps) => {
     }, [createPeerConnection]);
 
     const handleRenegotiation = useCallback(async (sdp: string): Promise<string> => {
-        console.log('🔄 Handling renegotiation from SFU');
+        console.log('Handling renegotiation from SFU');
 
         const pc = pcRef.current;
         if (!pc) {
@@ -115,6 +115,22 @@ export const useWebRTC = ({ localStream, onRemoteTrack }: UseWebRTCProps) => {
             setPeerConnection(null);
         }
     }, []);
+
+
+    useEffect(() => {
+        const pc = pcRef.current;
+        if (pc && localStream) {
+            const senders = pc.getSenders();
+            const existingTrackIds = senders.map(sender => sender.track?.id).filter(Boolean);
+
+            localStream.getTracks().forEach(track => {
+                if (!existingTrackIds.includes(track.id)) {
+                    console.log('Adding late-arriving track:', track.kind, track.id);
+                    pc.addTrack(track, localStream);
+                }
+            });
+        }
+    }, [localStream]);
 
     return {
         peerConnection,

@@ -34,8 +34,11 @@ export default function StudentVideoView({ studentInfo }: StudentVideoViewProps)
     const handleRemoteTrack = useCallback((event: RTCTrackEvent) => {
         const { track, streams } = event;
 
-        // Only process video tracks
-        if (track.kind !== 'video') return;
+        console.log('Remote track received:', {
+            kind: track.kind,
+            trackId: track.id,
+            streamId: streams[0]?.id
+        });
 
         const stream = streams[0];
         if (!stream) return;
@@ -43,8 +46,27 @@ export default function StudentVideoView({ studentInfo }: StudentVideoViewProps)
         const peerId = extractPeerIdFromTrack(track.id, stream.id);
 
         if (peerId && isProctorTrack(peerId)) {
-            console.log('Setting proctor stream');
-            setProctorStream(stream);
+            console.log('Processing proctor track:', track.kind);
+            setProctorStream(prevStream => {
+                let mediaStream: MediaStream;
+                if (prevStream) {
+                    mediaStream = prevStream;
+                    console.log('Adding', track.kind, 'track to existing proctor stream');
+                } else {
+                    mediaStream = new MediaStream();
+                    console.log('Created new MediaStream for proctor');
+                }
+
+                const existingTrackIds = mediaStream.getTracks().map(t => t.id);
+                if (!existingTrackIds.includes(track.id)) {
+                    mediaStream.addTrack(track);
+                    console.log('Added', track.kind, 'track to proctor stream');
+                } else {
+                    console.log('Track already in stream, skipping');
+                }
+
+                return mediaStream;
+            });
             setIsWaitingForProctor(false);
         }
     }, []);
@@ -104,11 +126,21 @@ export default function StudentVideoView({ studentInfo }: StudentVideoViewProps)
             try {
                 // Start media first
                 await startMedia();
+                console.log('Media started, waiting for state update...');
+            } catch (err) {
+                console.error('Failed to initialize media:', err);
+            }
+        };
+        init();
+    }, [startMedia]);
 
-                // Wait a bit for media to stabilize
-                await new Promise(resolve => setTimeout(resolve, 500));
 
-                // Send Join message
+    useEffect(() => {
+        if (localStream) {
+            console.log('LocalStream is ready, sending Join message');
+
+
+            const timer = setTimeout(() => {
                 send({
                     type: 'Join',
                     room_id: studentInfo.roomId,
@@ -116,14 +148,12 @@ export default function StudentVideoView({ studentInfo }: StudentVideoViewProps)
                     name: studentInfo.name,
                     role: 'student'
                 });
-
                 console.log('Participant joined');
-            } catch (err) {
-                console.error('Failed to initialize:', err);
-            }
-        };
-        init();
-    }, [startMedia, send, studentInfo]);
+            }, 100);
+
+            return () => clearTimeout(timer);
+        }
+    }, [localStream, send, studentInfo]);
 
     useEffect(() => {
         if (proctorVideoRef.current && proctorStream) {

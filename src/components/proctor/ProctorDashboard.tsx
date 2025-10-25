@@ -52,6 +52,11 @@ export default function ProctorDashboard() {
         const studentId = extractPeerIdFromTrack(track.id, stream.id);
         console.log('Extracted participant ID:', studentId);
 
+        if (studentId === peerId) {
+            console.log('Ignoring proctor\'s own track');
+            return;
+        }
+
         if (studentId && isStudentTrack(studentId)) {
             console.log('Processing track for student:', studentId, track.kind);
 
@@ -102,7 +107,7 @@ export default function ProctorDashboard() {
         } else {
             console.log('Not a participant track or invalid ID:', studentId);
         }
-    }, []);
+    }, [peerId]);
 
 
     const { handleOffer, handleRenegotiation, addIceCandidate } = useWebRTC({
@@ -234,8 +239,12 @@ export default function ProctorDashboard() {
                 <h1 className="text-gray-800 text-2xl font-semibold">Proctor Dashboard</h1>
                 <div>
                     {!roomId ? (
-                        <button onClick={handleStartRoom} className="py-2 px-6 rounded-lg border-0 text-sm font-medium cursor-pointer transition-all duration-300 bg-primary text-white hover:-translate-y-0.5 hover:shadow-xl">
-                            Start Room
+                        <button
+                            onClick={handleStartRoom}
+                            disabled={!localStream}
+                            className="py-2 px-6 rounded-lg border-0 text-sm font-medium cursor-pointer transition-all duration-300 bg-primary text-white hover:-translate-y-0.5 hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:shadow-none"
+                        >
+                            {localStream ? 'Start Room' : 'Initializing...'}
                         </button>
                     ) : (
                         <div>Room ID: <strong>{roomId}</strong></div>

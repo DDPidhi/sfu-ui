@@ -14,7 +14,7 @@ export const extractPeerIdFromTrack = (trackId: string, streamId: string): strin
         if (match) {
             peerId = match[1];
             if (DEBUG_TRACKS) {
-                console.log('✅ Extracted from stream ID:', peerId);
+                console.log('Extracted from stream ID:', peerId);
             }
             return peerId;
         }
