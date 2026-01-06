@@ -230,7 +230,7 @@ export default function StudentVideoView({ studentInfo }: StudentVideoViewProps)
                         <>
                             <video
                                 ref={studentVideoRef}
-                                className="w-full h-full object-cover"
+                                className="w-full h-full object-cover -scale-x-100"
                                 autoPlay
                                 muted
                                 playsInline

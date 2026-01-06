@@ -3,6 +3,7 @@ import StudentCard from './StudentCard';
 import JoinRequestCard from './JoinRequestCard';
 import MediaControls from "../shared/MediaControls.tsx";
 import {ConnectionStatus} from "../shared/ConnectionStatus.tsx";
+import DeviceSelector from "../shared/DeviceSelector.tsx";
 import type {JoinRequest, StudentInfo} from "../../types/room.types.ts";
 import {useMediaDevices} from "../../hooks/useMediaDevices.ts";
 import {extractPeerIdFromTrack, isStudentTrack} from "../../utils/trackIdentification.ts";
@@ -28,9 +29,14 @@ export default function ProctorDashboard() {
         localStream,
         isVideoEnabled,
         isAudioEnabled,
-        startMedia,
+        error: mediaError,
         toggleVideo,
-        toggleAudio
+        toggleAudio,
+        availableCameras,
+        availableMicrophones,
+        needsDeviceSelection,
+        startMediaWithDevices,
+        enumerateDevices
     } = useMediaDevices();
 
     const handleRemoteTrack = useCallback((event: RTCTrackEvent) => {
@@ -184,18 +190,10 @@ export default function ProctorDashboard() {
 
     const { connect, send } = useWebSocket(handleMessage);
 
+    // Enumerate devices on mount to populate the device selector
     useEffect(() => {
-        const init = async () => {
-            try {
-                await startMedia();
-                await connect();
-                console.log('Proctor initialized');
-            } catch (err) {
-                console.error('Initialization failed:', err);
-            }
-        };
-        init();
-    }, [startMedia, connect]);
+        enumerateDevices();
+    }, [enumerateDevices]);
 
 
     const handleStartRoom = () => {
@@ -231,9 +229,28 @@ export default function ProctorDashboard() {
         setJoinRequests(prev => prev.filter(r => r.peer_id !== studentPeerId));
     };
 
+    const handleDeviceSelect = async (cameraId: string | null, microphoneId: string | null) => {
+        try {
+            await startMediaWithDevices(cameraId, microphoneId);
+            await connect();
+            console.log('Proctor initialized with selected devices');
+        } catch (err) {
+            console.error('Failed to start with selected devices:', err);
+        }
+    };
+
     return (
         <div className="min-h-screen flex flex-col">
             <ConnectionStatus />
+
+            {/* Device Selection Modal */}
+            <DeviceSelector
+                isOpen={needsDeviceSelection}
+                cameras={availableCameras}
+                microphones={availableMicrophones}
+                onSelect={handleDeviceSelect}
+                error={mediaError}
+            />
             {/* Header */}
             <header className="bg-gray-100 border-b border-gray-300 p-4 px-8 flex justify-between items-center">
                 <h1 className="text-gray-800 text-2xl font-semibold">Proctor Dashboard</h1>
@@ -289,7 +306,7 @@ export default function ProctorDashboard() {
                         autoPlay
                         muted
                         playsInline
-                        className="w-full h-full object-cover"
+                        className="w-full h-full object-cover -scale-x-100"
                     />
                 </div>
             </div>
