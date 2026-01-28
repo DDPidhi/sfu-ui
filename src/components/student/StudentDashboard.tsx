@@ -21,6 +21,8 @@ function formatGrade(grade: bigint): string {
   return (Number(grade) / 100).toFixed(2) + '%'
 }
 
+const IPFS_GATEWAY_URL = import.meta.env.VITE_IPFS_GATEWAY_URL || 'https://ipfs.io/ipfs'
+
 function ExamCard({ exam }: { exam: ExamResult }) {
   const gradePercent = Number(exam.grade) / 100
 
@@ -68,7 +70,7 @@ function ExamCard({ exam }: { exam: ExamResult }) {
             {exam.recordings.map((cid, idx) => (
               <a
                 key={idx}
-                href={`https://ipfs.io/ipfs/${cid}`}
+                href={`${IPFS_GATEWAY_URL}/${cid}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-xs px-2 py-1 bg-blue-50 text-blue-600 rounded hover:bg-blue-100 transition-colors"

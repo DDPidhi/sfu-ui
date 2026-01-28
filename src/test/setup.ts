@@ -226,9 +226,35 @@ class MockWebSocket {
   }
 }
 
+// Mock RTCSessionDescription
+class MockRTCSessionDescription {
+  type: RTCSdpType;
+  sdp: string;
+
+  constructor(init: RTCSessionDescriptionInit) {
+    this.type = init.type!;
+    this.sdp = init.sdp || '';
+  }
+}
+
+// Mock RTCIceCandidate
+class MockRTCIceCandidate {
+  candidate: string;
+  sdpMid: string | null;
+  sdpMLineIndex: number | null;
+
+  constructor(init: RTCIceCandidateInit) {
+    this.candidate = init.candidate || '';
+    this.sdpMid = init.sdpMid || null;
+    this.sdpMLineIndex = init.sdpMLineIndex ?? null;
+  }
+}
+
 // Apply mocks to global
 global.MediaStream = MockMediaStream as any;
 global.RTCPeerConnection = MockRTCPeerConnection as any;
+global.RTCSessionDescription = MockRTCSessionDescription as any;
+global.RTCIceCandidate = MockRTCIceCandidate as any;
 global.WebSocket = MockWebSocket as any;
 
 Object.defineProperty(navigator, 'mediaDevices', {
