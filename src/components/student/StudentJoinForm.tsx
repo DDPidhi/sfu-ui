@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import type {SignalingMessage} from "../../types/signaling.types.ts";
 import {useWebSocket} from "../../hooks/useWebSocket.ts";
+import {useWallet} from "../../hooks/useWallet.ts";
+import WalletConnect from "../shared/WalletConnect.tsx";
 
 interface StudentJoinFormProps {
     onJoin: (name: string, roomId: string, peerId: string) => void;
@@ -12,6 +14,15 @@ export default function StudentJoinForm({ onJoin }: StudentJoinFormProps) {
     const [peerId] = useState(`student-${Math.random().toString(36).substr(2, 9)}`);
     const [status, setStatus] = useState('');
     const [isRequesting, setIsRequesting] = useState(false);
+
+    const {
+        address: walletAddress,
+        isConnecting: isWalletConnecting,
+        isConnected: isWalletConnected,
+        error: walletError,
+        connect: connectWallet,
+        formatAddress,
+    } = useWallet();
 
     const handleMessage = (msg: SignalingMessage) => {
         console.log('Participant received:', msg);
@@ -50,6 +61,11 @@ export default function StudentJoinForm({ onJoin }: StudentJoinFormProps) {
             return;
         }
 
+        if (!isWalletConnected || !walletAddress) {
+            setStatus('Please connect your wallet first');
+            return;
+        }
+
         setIsRequesting(true);
         setStatus('Connecting...');
 
@@ -57,13 +73,14 @@ export default function StudentJoinForm({ onJoin }: StudentJoinFormProps) {
             // Connect to WebSocket
             await connect();
 
-            // Send join request
+            // Send join request with wallet address
             send({
                 type: 'JoinRequest',
                 room_id: roomId,
                 peer_id: peerId,
                 name: name,
-                role: 'student'
+                role: 'student',
+                wallet_address: walletAddress,
             });
 
             setStatus('Requesting to join...');
@@ -78,6 +95,20 @@ export default function StudentJoinForm({ onJoin }: StudentJoinFormProps) {
             <div className="bg-white/95 backdrop-blur-md rounded-2xl p-12 w-full max-w-md shadow-2xl">
                 <h1 className="text-gray-800 text-center mb-8 text-3xl">Join Room</h1>
                 <form onSubmit={handleSubmit}>
+                    {/* Wallet Connection */}
+                    <div className="mb-6">
+                        <label className="block mb-2 text-gray-600 font-medium">Wallet</label>
+                        <WalletConnect
+                            address={walletAddress}
+                            isConnecting={isWalletConnecting}
+                            isConnected={isWalletConnected}
+                            error={walletError}
+                            onConnect={connectWallet}
+                            formatAddress={formatAddress}
+                            disabled={isRequesting}
+                        />
+                    </div>
+
                     <div className="mb-6">
                         <label className="block mb-2 text-gray-600 font-medium">Your Name</label>
                         <input
@@ -105,7 +136,8 @@ export default function StudentJoinForm({ onJoin }: StudentJoinFormProps) {
                     </div>
                     <button
                         type="submit"
-                        className="w-full p-4 bg-primary text-white border-0 rounded-xl text-lg font-semibold cursor-pointer transition-all duration-300 hover:-translate-y-0.5 hover:shadow-xl hover:shadow-primary/40"
+                        disabled={!isWalletConnected || isRequesting}
+                        className="w-full p-4 bg-primary text-white border-0 rounded-xl text-lg font-semibold cursor-pointer transition-all duration-300 hover:-translate-y-0.5 hover:shadow-xl hover:shadow-primary/40 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:shadow-none"
                     >
                         {isRequesting ? 'Joining...' : 'Join Room'}
                     </button>

@@ -14,13 +14,22 @@ export type SignalingMessage =
     | JoinRequestSentMessage
     | JoinApprovedMessage
     | JoinDeniedMessage
-    | ErrorMessage;
+    | ErrorMessage
+    | KickParticipantMessage
+    | ParticipantKickedMessage
+    | ParticipantLeftMessage
+    | ReportSuspiciousActivityMessage
+    | SuspiciousActivityReportedMessage
+    | SubmitExamResultMessage
+    | ExamResultSubmittedMessage
+    | EndExamMessage;
 
 // Outgoing messages (Client → Server)
 export interface CreateRoomMessage {
     type: 'CreateRoom';
     peer_id: string;
     name?: string;
+    wallet_address?: string;
 }
 
 export interface JoinRequestMessage {
@@ -29,6 +38,7 @@ export interface JoinRequestMessage {
     peer_id: string;
     name?: string;
     role: string;
+    wallet_address?: string;
 }
 
 export interface JoinMessage {
@@ -37,6 +47,7 @@ export interface JoinMessage {
     peer_id: string;
     name?: string;
     role: string;
+    wallet_address?: string;
 }
 
 export interface JoinResponseMessage {
@@ -110,4 +121,65 @@ export interface JoinDeniedMessage {
 export interface ErrorMessage {
     type: 'error';
     message: string;
+}
+
+// Proctor action messages
+export interface KickParticipantMessage {
+    type: 'KickParticipant';
+    room_id: string;
+    peer_id: string;
+    reason?: string;
+}
+
+export interface ParticipantKickedMessage {
+    type: 'ParticipantKicked';
+    room_id: string;
+    peer_id: string;
+    reason?: string;
+}
+
+export interface ParticipantLeftMessage {
+    type: 'ParticipantLeft';
+    room_id: string;
+    peer_id: string;
+    name?: string;
+}
+
+export interface ReportSuspiciousActivityMessage {
+    type: 'ReportSuspiciousActivity';
+    room_id: string;
+    peer_id: string;
+    activity_type: string; // "multiple_devices", "tab_switch", "window_blur", "screen_share", "unauthorized_person", "audio_anomaly", "other"
+    details?: string;
+}
+
+export interface SuspiciousActivityReportedMessage {
+    type: 'SuspiciousActivityReported';
+    room_id: string;
+    peer_id: string;
+    activity_type: string;
+}
+
+// Exam result messages
+export interface SubmitExamResultMessage {
+    type: 'SubmitExamResult';
+    room_id: string;
+    peer_id: string;
+    score: number;      // Score achieved (e.g., 4 out of 5)
+    total: number;      // Total possible (e.g., 5)
+    exam_name?: string;
+}
+
+export interface ExamResultSubmittedMessage {
+    type: 'ExamResultSubmitted';
+    room_id: string;
+    peer_id: string;
+    grade: number;      // Grade in basis points (8000 = 80.00%)
+}
+
+// Exam control messages
+export interface EndExamMessage {
+    type: 'EndExam';
+    room_id: string;
+    peer_id: string;
 }

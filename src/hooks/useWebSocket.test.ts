@@ -100,6 +100,7 @@ describe('useWebSocket', () => {
     const testMessage: SignalingMessage = {
       type: 'join_approved',
       room_id: '123456',
+      message: 'Approved',
     };
 
     await act(async () => {
@@ -121,6 +122,7 @@ describe('useWebSocket', () => {
     const testMessage: SignalingMessage = {
       type: 'join_approved',
       room_id: '123456',
+      message: 'Approved',
     };
 
     await act(async () => {
@@ -156,6 +158,7 @@ describe('useWebSocket', () => {
     const testMessage1: SignalingMessage = {
       type: 'join_approved',
       room_id: '123456',
+      message: 'Approved',
     };
 
     await act(async () => {
@@ -172,6 +175,7 @@ describe('useWebSocket', () => {
     const testMessage2: SignalingMessage = {
       type: 'join_denied',
       room_id: '123456',
+      message: 'Denied',
     };
 
     await act(async () => {
@@ -200,6 +204,7 @@ describe('useWebSocket', () => {
     const testMessage: SignalingMessage = {
       type: 'join_approved',
       room_id: '123456',
+      message: 'Approved',
     };
 
     // Should not throw error

@@ -3,25 +3,40 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import StudentJoinForm from './StudentJoinForm';
 import * as useWebSocketModule from '../../hooks/useWebSocket';
+import * as useWalletModule from '../../hooks/useWallet';
 
-// Mock the useWebSocket hook
+// Mock the hooks
 vi.mock('../../hooks/useWebSocket');
+vi.mock('../../hooks/useWallet');
 
 describe('StudentJoinForm', () => {
   const mockOnJoin = vi.fn();
   const mockConnect = vi.fn();
   const mockSend = vi.fn();
   const mockDisconnect = vi.fn();
+  const mockConnectWallet = vi.fn();
 
   beforeEach(() => {
     vi.clearAllMocks();
     mockConnect.mockResolvedValue(true);
+    mockConnectWallet.mockResolvedValue('0x1234567890abcdef1234567890abcdef12345678');
 
     vi.spyOn(useWebSocketModule, 'useWebSocket').mockReturnValue({
       connect: mockConnect,
       send: mockSend,
       disconnect: mockDisconnect,
-      isConnected: () => true,
+      isConnected: true,
+    });
+
+    // Default: wallet connected
+    vi.spyOn(useWalletModule, 'useWallet').mockReturnValue({
+      address: '0x1234567890abcdef1234567890abcdef12345678',
+      isConnecting: false,
+      isConnected: true,
+      error: null,
+      connect: mockConnectWallet,
+      disconnect: vi.fn(),
+      formatAddress: (addr: string | null | undefined) => addr ? `${addr.slice(0, 6)}...${addr.slice(-4)}` : '',
     });
   });
 
@@ -32,6 +47,28 @@ describe('StudentJoinForm', () => {
     expect(screen.getByPlaceholderText('Enter your full name')).toBeInTheDocument();
     expect(screen.getByPlaceholderText('Enter 6-digit room ID')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /join room/i })).toBeInTheDocument();
+  });
+
+  it('should render wallet connect button when not connected', () => {
+    vi.spyOn(useWalletModule, 'useWallet').mockReturnValue({
+      address: null,
+      isConnecting: false,
+      isConnected: false,
+      error: null,
+      connect: mockConnectWallet,
+      disconnect: vi.fn(),
+      formatAddress: (_addr: string | null | undefined) => '',
+    });
+
+    render(<StudentJoinForm onJoin={mockOnJoin} />);
+
+    expect(screen.getByRole('button', { name: /connect wallet/i })).toBeInTheDocument();
+  });
+
+  it('should show connected wallet address', () => {
+    render(<StudentJoinForm onJoin={mockOnJoin} />);
+
+    expect(screen.getByText('0x1234...5678')).toBeInTheDocument();
   });
 
   it('should update name input when user types', async () => {
@@ -65,6 +102,31 @@ describe('StudentJoinForm', () => {
     await user.type(roomIdInput, '1234567890');
 
     expect(roomIdInput.value).toBe('123456');
+  });
+
+  it('should show error if wallet not connected on submit', async () => {
+    vi.spyOn(useWalletModule, 'useWallet').mockReturnValue({
+      address: null,
+      isConnecting: false,
+      isConnected: false,
+      error: null,
+      connect: mockConnectWallet,
+      disconnect: vi.fn(),
+      formatAddress: (_addr: string | null | undefined) => '',
+    });
+
+    const user = userEvent.setup();
+    render(<StudentJoinForm onJoin={mockOnJoin} />);
+
+    const nameInput = screen.getByPlaceholderText('Enter your full name');
+    const roomIdInput = screen.getByPlaceholderText('Enter 6-digit room ID');
+
+    await user.type(nameInput, 'John Doe');
+    await user.type(roomIdInput, '123456');
+
+    // Submit button should be disabled when wallet not connected
+    const submitButton = screen.getByRole('button', { name: /join room/i });
+    expect(submitButton).toBeDisabled();
   });
 
   it('should show error if name is empty on submit', async () => {
@@ -113,7 +175,7 @@ describe('StudentJoinForm', () => {
     expect(mockConnect).not.toHaveBeenCalled();
   });
 
-  it('should connect to WebSocket and send join request on valid submit', async () => {
+  it('should connect to WebSocket and send join request with wallet address on valid submit', async () => {
     const user = userEvent.setup();
     render(<StudentJoinForm onJoin={mockOnJoin} />);
 
@@ -138,6 +200,7 @@ describe('StudentJoinForm', () => {
           name: 'John Doe',
           role: 'student',
           peer_id: expect.stringContaining('student-'),
+          wallet_address: '0x1234567890abcdef1234567890abcdef12345678',
         })
       );
     });

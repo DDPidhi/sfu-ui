@@ -4,8 +4,10 @@ import JoinRequestCard from './JoinRequestCard';
 import MediaControls from "../shared/MediaControls.tsx";
 import {ConnectionStatus} from "../shared/ConnectionStatus.tsx";
 import DeviceSelector from "../shared/DeviceSelector.tsx";
+import WalletConnect from "../shared/WalletConnect.tsx";
 import type {JoinRequest, StudentInfo} from "../../types/room.types.ts";
 import {useMediaDevices} from "../../hooks/useMediaDevices.ts";
+import {useWallet} from "../../hooks/useWallet.ts";
 import {extractPeerIdFromTrack, isStudentTrack} from "../../utils/trackIdentification.ts";
 import {useWebRTC} from "../../hooks/useWebRTC.ts";
 import {useWebSocket} from "../../hooks/useWebSocket.ts";
@@ -20,6 +22,15 @@ export default function ProctorDashboard() {
     const [joinRequests, setJoinRequests] = useState<JoinRequest[]>([]);
 
     const studentNamesRef = useRef<Map<string, string>>(new Map());
+
+    const {
+        address: walletAddress,
+        isConnecting: isWalletConnecting,
+        isConnected: isWalletConnected,
+        error: walletError,
+        connect: connectWallet,
+        formatAddress,
+    } = useWallet();
 
     useEffect(() => {
         studentNamesRef.current = studentNames;
@@ -185,6 +196,24 @@ export default function ProctorDashboard() {
                     });
                 }
                 break;
+
+            case 'ParticipantLeft':
+                console.log('Participant left:', msg.peer_id, msg.name);
+                // Remove the student from local state
+                setStudents(prev => {
+                    const updated = new Map(prev);
+                    const studentName = updated.get(msg.peer_id)?.name || msg.name || msg.peer_id;
+                    updated.delete(msg.peer_id);
+                    console.log(`Student ${studentName} has left the room`);
+                    return updated;
+                });
+                // Also remove from studentNames map
+                setStudentNames(prev => {
+                    const updated = new Map(prev);
+                    updated.delete(msg.peer_id);
+                    return updated;
+                });
+                break;
         }
     }, [handleOffer, handleRenegotiation, addIceCandidate, peerId]);
 
@@ -197,10 +226,15 @@ export default function ProctorDashboard() {
 
 
     const handleStartRoom = () => {
+        if (!isWalletConnected || !walletAddress) {
+            console.error('Wallet not connected');
+            return;
+        }
         send({
             type: 'CreateRoom',
             peer_id: peerId,
-            name: 'Proctor'
+            name: 'Proctor',
+            wallet_address: walletAddress,
         });
     };
 
@@ -229,6 +263,56 @@ export default function ProctorDashboard() {
         setJoinRequests(prev => prev.filter(r => r.peer_id !== studentPeerId));
     };
 
+    const handleKickStudent = (studentPeerId: string, reason?: string) => {
+        console.log('Kicking student:', studentPeerId, reason);
+        send({
+            type: 'KickParticipant',
+            room_id: roomId!,
+            peer_id: studentPeerId,
+            reason
+        });
+        // Remove from local state
+        setStudents(prev => {
+            const updated = new Map(prev);
+            updated.delete(studentPeerId);
+            return updated;
+        });
+    };
+
+    const handleWarnStudent = (studentPeerId: string, message: string) => {
+        console.log('Warning student:', studentPeerId, message);
+        // For now, just log - could send a message to the student
+        alert(`Warning sent to ${students.get(studentPeerId)?.name || studentPeerId}: ${message}`);
+    };
+
+    const handleReportSuspicious = (studentPeerId: string, activityType: string, details?: string) => {
+        console.log('Reporting suspicious activity:', studentPeerId, activityType, details);
+        send({
+            type: 'ReportSuspiciousActivity',
+            room_id: roomId!,
+            peer_id: studentPeerId,
+            activity_type: activityType,
+            details
+        });
+        alert(`Suspicious activity reported: ${activityType} for ${students.get(studentPeerId)?.name || studentPeerId}`);
+    };
+
+    const handleEndExam = () => {
+        if (!roomId) return;
+        if (!confirm('Are you sure you want to end the exam? This will close the room for all participants.')) {
+            return;
+        }
+        console.log('Ending exam for room:', roomId);
+        send({
+            type: 'Leave',
+            peer_id: peerId
+        });
+        // Reset state
+        setRoomId(null);
+        setStudents(new Map());
+        setJoinRequests([]);
+    };
+
     const handleDeviceSelect = async (cameraId: string | null, microphoneId: string | null) => {
         try {
             await startMediaWithDevices(cameraId, microphoneId);
@@ -254,17 +338,36 @@ export default function ProctorDashboard() {
             {/* Header */}
             <header className="bg-gray-100 border-b border-gray-300 p-4 px-8 flex justify-between items-center">
                 <h1 className="text-gray-800 text-2xl font-semibold">Proctor Dashboard</h1>
-                <div>
+                <div className="flex items-center gap-4">
+                    {/* Wallet Connection */}
+                    <WalletConnect
+                        address={walletAddress}
+                        isConnecting={isWalletConnecting}
+                        isConnected={isWalletConnected}
+                        error={walletError}
+                        onConnect={connectWallet}
+                        formatAddress={formatAddress}
+                        disabled={!!roomId}
+                    />
+
                     {!roomId ? (
                         <button
                             onClick={handleStartRoom}
-                            disabled={!localStream}
+                            disabled={!localStream || !isWalletConnected}
                             className="py-2 px-6 rounded-lg border-0 text-sm font-medium cursor-pointer transition-all duration-300 bg-primary text-white hover:-translate-y-0.5 hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:shadow-none"
                         >
-                            {localStream ? 'Start Room' : 'Initializing...'}
+                            {!localStream ? 'Initializing...' : !isWalletConnected ? 'Connect Wallet First' : 'Start Room'}
                         </button>
                     ) : (
-                        <div>Room ID: <strong>{roomId}</strong></div>
+                        <div className="flex items-center gap-4">
+                            <div>Room ID: <strong>{roomId}</strong></div>
+                            <button
+                                onClick={handleEndExam}
+                                className="py-2 px-4 rounded-lg border-0 text-sm font-medium cursor-pointer transition-all duration-300 bg-red-500 text-white hover:bg-red-600 hover:-translate-y-0.5 hover:shadow-xl"
+                            >
+                                End Exam
+                            </button>
+                        </div>
                     )}
                 </div>
             </header>
@@ -281,10 +384,16 @@ export default function ProctorDashboard() {
                 ))}
             </div>
 
-            {/* Participants Grid */}
-            <div className="grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-6 p-8 flex-1">
+            {/* Participants Grid - pb-24 for footer space, items-start to prevent stretching */}
+            <div className="grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-6 p-8 pb-24 items-start content-start">
                 {Array.from(students.values()).map(student => (
-                    <StudentCard key={student.id} student={student} />
+                    <StudentCard
+                        key={student.id}
+                        student={student}
+                        onKick={handleKickStudent}
+                        onWarn={handleWarnStudent}
+                        onReportSuspicious={handleReportSuspicious}
+                    />
                 ))}
                 {students.size === 0 && (
                     <div className="">
@@ -322,6 +431,12 @@ export default function ProctorDashboard() {
                         <span className="opacity-70 text-sm">Students:</span>
                         <span className="font-semibold">{students.size}</span>
                     </div>
+                    {walletAddress && (
+                        <div className="flex items-center gap-2">
+                            <span className="opacity-70 text-sm">Wallet:</span>
+                            <span className="font-semibold">{formatAddress(walletAddress)}</span>
+                        </div>
+                    )}
                 </div>
 
                 <MediaControls

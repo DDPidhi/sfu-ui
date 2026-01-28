@@ -162,12 +162,12 @@ class MockRTCPeerConnection {
     this.signalingState = 'stable';
   }
 
-  async addIceCandidate(candidate: RTCIceCandidateInit) {
+  async addIceCandidate(_candidate: RTCIceCandidateInit) {
     // Mock implementation
     return Promise.resolve();
   }
 
-  addTrack(track: MediaStreamTrack, stream: MediaStream) {
+  addTrack(track: MediaStreamTrack, _stream: MediaStream) {
     const sender = {
       track,
       replaceTrack: vi.fn().mockResolvedValue(undefined),
@@ -211,7 +211,7 @@ class MockWebSocket {
     }, 10);
   }
 
-  send(data: string) {
+  send(_data: string) {
     if (this.readyState !== MockWebSocket.OPEN) {
       throw new Error('WebSocket is not open');
     }
